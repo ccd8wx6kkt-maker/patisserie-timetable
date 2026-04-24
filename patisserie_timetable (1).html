@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>L'Élégance Pâtisserie Academy — 시간표</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f4f0;min-height:100vh;padding:2rem 1.5rem;}
+.wrap{max-width:960px;margin:0 auto;}
+.header{margin-bottom:1.5rem;}
+.header h1{font-size:20px;font-weight:500;color:#1a1a1a;margin-bottom:2px;}
+.header p{font-size:13px;color:#888;}
+.layout{display:flex;gap:16px;align-items:flex-start;}
+.sidebar{width:196px;flex-shrink:0;}
+.sidebar-title{font-size:10px;font-weight:600;color:#aaa;letter-spacing:.08em;text-transform:uppercase;margin-bottom:10px;padding:0 2px;}
+.cat-label{font-size:10px;font-weight:600;color:#bbb;letter-spacing:.05em;margin:14px 0 5px 2px;}
+.chip{padding:7px 10px;border-radius:8px;font-size:12px;font-weight:500;cursor:grab;margin-bottom:5px;border:1px solid transparent;user-select:none;display:flex;align-items:center;justify-content:space-between;gap:6px;transition:opacity .15s;}
+.chip:hover{opacity:.82;}
+.chip-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.chip-badge{font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;background:rgba(0,0,0,.09);flex-shrink:0;white-space:nowrap;}
+.chip.used{opacity:.35;cursor:default;}
+.timetable-area{flex:1;min-width:0;}
+.top-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.school-name{font-size:14px;font-weight:500;color:#1a1a1a;}
+.right-bar{display:flex;align-items:center;gap:10px;}
+.credit-total{font-size:12px;color:#666;background:#fff;padding:5px 12px;border-radius:8px;border:1px solid #e0ddd6;}
+.credit-total span{font-weight:600;color:#1a1a1a;}
+.clear-btn{font-size:12px;padding:5px 13px;border:1px solid #d0cdc6;border-radius:8px;background:#fff;color:#666;cursor:pointer;transition:background .15s;}
+.clear-btn:hover{background:#f0ede8;}
+.grid-wrap{display:flex;border:1px solid #e0ddd6;border-radius:12px;overflow:hidden;background:#fff;}
+.time-col{width:48px;flex-shrink:0;border-right:1px solid #e0ddd6;}
+.t-hdr{height:34px;background:#f8f7f4;border-bottom:1px solid #e0ddd6;}
+.t-slot{height:52px;display:flex;align-items:flex-start;justify-content:flex-end;padding:5px 7px 0 0;font-size:10px;color:#bbb;border-bottom:1px solid #e0ddd6;}
+.days-wrap{display:flex;flex:1;min-width:0;}
+.day-col{flex:1;min-width:0;border-right:1px solid #e0ddd6;position:relative;}
+.day-col:last-child{border-right:none;}
+.d-hdr{height:34px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:#888;background:#f8f7f4;border-bottom:1px solid #e0ddd6;}
+.d-body{position:relative;}
+.cell{height:52px;border-bottom:1px solid #e0ddd6;}
+.cell:last-child{border-bottom:none;}
+.cell.drag-over{background:rgba(211,163,95,.12);}
+.block{position:absolute;left:2px;right:2px;border-radius:6px;padding:5px 7px;cursor:grab;overflow:hidden;z-index:10;border:1px solid transparent;}
+.block:hover{z-index:20;filter:brightness(.97);}
+.block.dragging{opacity:.7;z-index:100;cursor:grabbing;}
+.b-name{font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.b-room{font-size:10px;opacity:.68;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px;}
+.b-credit{font-size:10px;font-weight:600;opacity:.82;margin-top:2px;}
+.b-del{position:absolute;top:4px;right:5px;font-size:11px;opacity:0;cursor:pointer;padding:2px;line-height:1;}
+.block:hover .b-del{opacity:.5;}
+.b-del:hover{opacity:1!important;}
+.b-rsz{position:absolute;bottom:0;left:0;right:0;height:7px;cursor:ns-resize;border-radius:0 0 6px 6px;}
+.hint{font-size:11px;color:#bbb;margin-top:9px;text-align:center;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="header">
+    <h1>시간표</h1>
+  </div>
+  <div class="layout">
+    <div class="sidebar">
+      <div class="sidebar-title">강의 목록</div>
+      <div id="chipList"></div>
+    </div>
+    <div class="timetable-area">
+      <div class="top-bar">
+        <div class="right-bar">
+          <div class="credit-total">총 이수 학점 <span id="totalCredit">0</span>학점</div>
+          <button class="clear-btn" onclick="clearAll()">초기화</button>
+        </div>
+      </div>
+      <div class="grid-wrap">
+        <div class="time-col" id="timeCol"></div>
+        <div class="days-wrap" id="daysWrap"></div>
+      </div>
+      <div class="hint">강의를 드래그하여 시간표에 배치 · 블록 하단 드래그로 시간 조절 · ✕ 클릭으로 삭제</div>
+    </div>
+  </div>
+
+  <div class="map-section">
+    <div class="map-title">캠퍼스 안내도</div>
+    <div class="map-wrap">
+      <svg viewBox="0 0 820 500" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block;">
+
+        <!-- 잔디·배경 -->
+        <rect x="0" y="0" width="820" height="500" fill="#eef4ec" rx="12"/>
+
+        <!-- 도로 -->
+        <rect x="0" y="220" width="820" height="32" fill="#ddd9d0"/>
+        <rect x="360" y="0" width="32" height="500" fill="#ddd9d0"/>
+        <!-- 도로 중앙선 -->
+        <line x1="0" y1="236" x2="820" y2="236" stroke="#c8c4bb" stroke-width="1.5" stroke-dasharray="18 10"/>
+        <line x1="376" y1="0" x2="376" y2="500" stroke="#c8c4bb" stroke-width="1.5" stroke-dasharray="18 10"/>
+
+        <!-- 도로 라벨 -->
+        <text x="170" y="241" font-size="10" fill="#aaa" text-anchor="middle" font-family="sans-serif">아카데미로</text>
+        <text x="595" y="241" font-size="10" fill="#aaa" text-anchor="middle" font-family="sans-serif">아카데미로</text>
+        <text x="381" y="120" font-size="10" fill="#aaa" text-anchor="start" font-family="sans-serif" transform="rotate(90,381,120)">엘레강스길</text>
+        <text x="381" y="380" font-size="10" fill="#aaa" text-anchor="start" font-family="sans-serif" transform="rotate(90,381,380)">엘레강스길</text>
+
+        <!-- 정문 -->
+        <rect x="340" y="210" width="72" height="42" fill="#c8c4bb" rx="3"/>
+        <text x="376" y="235" font-size="10" fill="#555" text-anchor="middle" font-family="sans-serif" font-weight="600">정문</text>
+
+        <!-- 나무들 -->
+        <circle cx="40" cy="50" r="14" fill="#a8cc8a" opacity=".8"/>
+        <circle cx="80" cy="70" r="10" fill="#92b876" opacity=".8"/>
+        <circle cx="310" cy="60" r="13" fill="#a8cc8a" opacity=".8"/>
+        <circle cx="280" cy="190" r="11" fill="#92b876" opacity=".8"/>
+        <circle cx="50" cy="400" r="14" fill="#a8cc8a" opacity=".8"/>
+        <circle cx="310" cy="420" r="12" fill="#92b876" opacity=".8"/>
+        <circle cx="760" cy="60" r="13" fill="#a8cc8a" opacity=".8"/>
+        <circle cx="790" cy="100" r="10" fill="#92b876" opacity=".8"/>
+        <circle cx="440" cy="420" r="14" fill="#a8cc8a" opacity=".8"/>
+        <circle cx="780" cy="420" r="13" fill="#92b876" opacity=".8"/>
+        <circle cx="130" cy="180" r="10" fill="#a8cc8a" opacity=".7"/>
+        <circle cx="670" cy="180" r="11" fill="#92b876" opacity=".7"/>
+
+        <!-- ===== 건물들 (왼쪽 상단 구역) ===== -->
+
+        <!-- 라 포르네 관 (제빵) -->
+        <rect x="60" y="60" width="130" height="80" fill="#FEF3E2" stroke="#F5C97A" stroke-width="1.5" rx="5"/>
+        <rect x="60" y="60" width="130" height="20" fill="#F5C97A" rx="5"/>
+        <rect x="60" y="76" width="130" height="4" fill="#F5C97A"/>
+        <text x="125" y="74" font-size="9" fill="#7C4A00" text-anchor="middle" font-family="sans-serif" font-weight="700">라 포르네 관</text>
+        <text x="125" y="93" font-size="8" fill="#7C4A00" text-anchor="middle" font-family="sans-serif">브레드 베이킹 기초 101</text>
+        <text x="125" y="106" font-size="8" fill="#7C4A00" text-anchor="middle" font-family="sans-serif">아르티장 브레드 102</text>
+        <text x="125" y="119" font-size="8" fill="#7C4A00" text-anchor="middle" font-family="sans-serif">바게트 & 크루아상 201</text>
+        <text x="125" y="132" font-size="7.5" fill="#aaa" text-anchor="middle" font-family="sans-serif">🥐 제빵 전용동</text>
+
+        <!-- 르 수크레 관 (제과) -->
+        <rect x="210" y="60" width="130" height="80" fill="#FBE8F3" stroke="#EDA8CF" stroke-width="1.5" rx="5"/>
+        <rect x="210" y="60" width="130" height="20" fill="#EDA8CF" rx="5"/>
+        <rect x="210" y="76" width="130" height="4" fill="#EDA8CF"/>
+        <text x="275" y="74" font-size="9" fill="#6B1B42" text-anchor="middle" font-family="sans-serif" font-weight="700">르 수크레 관</text>
+        <text x="275" y="93" font-size="8" fill="#6B1B42" text-anchor="middle" font-family="sans-serif">파티세리 기초 101</text>
+        <text x="275" y="106" font-size="8" fill="#6B1B42" text-anchor="middle" font-family="sans-serif">초콜라티에 입문 102</text>
+        <text x="275" y="119" font-size="8" fill="#6B1B42" text-anchor="middle" font-family="sans-serif">타르트 & 파이 201</text>
+        <text x="275" y="132" font-size="7.5" fill="#aaa" text-anchor="middle" font-family="sans-serif">🍰 제과 전용동</text>
+
+        <!-- 라 그라스 관 (냉동·아이싱) -->
+        <rect x="60" y="158" width="130" height="48" fill="#E8F4FB" stroke="#8EC9EF" stroke-width="1.5" rx="5"/>
+        <rect x="60" y="158" width="130" height="18" fill="#8EC9EF" rx="5"/>
+        <rect x="60" y="172" width="130" height="4" fill="#8EC9EF"/>
+        <text x="125" y="171" font-size="9" fill="#0D3F6E" text-anchor="middle" font-family="sans-serif" font-weight="700">라 그라스 관</text>
+        <text x="125" y="188" font-size="8" fill="#0D3F6E" text-anchor="middle" font-family="sans-serif">웨딩 케이크 마스터 301</text>
+        <text x="125" y="200" font-size="8" fill="#0D3F6E" text-anchor="middle" font-family="sans-serif">냉동 디저트 & 글라세 101</text>
+
+        <!-- ===== 오른쪽 상단 구역 ===== -->
+
+        <!-- 라 마종 관 (교양) -->
+        <rect x="408" y="40" width="160" height="100" fill="#E8F5EE" stroke="#7DCCA4" stroke-width="1.5" rx="5"/>
+        <rect x="408" y="40" width="160" height="20" fill="#7DCCA4" rx="5"/>
+        <rect x="408" y="56" width="160" height="4" fill="#7DCCA4"/>
+        <text x="488" y="54" font-size="9" fill="#0D4A2A" text-anchor="middle" font-family="sans-serif" font-weight="700">라 마종 관</text>
+        <text x="488" y="74" font-size="8" fill="#0D4A2A" text-anchor="middle" font-family="sans-serif">다도 & 티 페어링 101</text>
+        <text x="488" y="86" font-size="8" fill="#0D4A2A" text-anchor="middle" font-family="sans-serif">플라워 케이크 데코 102</text>
+        <text x="488" y="98" font-size="8" fill="#0D4A2A" text-anchor="middle" font-family="sans-serif">테이블 플로리스트리 103</text>
+        <text x="488" y="110" font-size="8" fill="#0D4A2A" text-anchor="middle" font-family="sans-serif">프렌치 에티켓 104</text>
+        <text x="488" y="130" font-size="7.5" fill="#aaa" text-anchor="middle" font-family="sans-serif">🌸 교양 전용동</text>
+
+        <!-- 라 뤼미에르 관 (포토그래피) -->
+        <rect x="588" y="40" width="130" height="60" fill="#E8F5EE" stroke="#7DCCA4" stroke-width="1.5" rx="5"/>
+        <rect x="588" y="40" width="130" height="18" fill="#7DCCA4" rx="5"/>
+        <rect x="588" y="54" width="130" height="4" fill="#7DCCA4"/>
+        <text x="653" y="53" font-size="9" fill="#0D4A2A" text-anchor="middle" font-family="sans-serif" font-weight="700">라 뤼미에르 관</text>
+        <text x="653" y="72" font-size="8" fill="#0D4A2A" text-anchor="middle" font-family="sans-serif">푸드 포토그래피 B1</text>
+        <text x="653" y="92" font-size="7.5" fill="#aaa" text-anchor="middle" font-family="sans-serif">📷 스튜디오동</text>
+
+        <!-- 라 사이언스 관 (이론) -->
+        <rect x="588" y="120" width="190" height="80" fill="#EEEDFE" stroke="#AFA9EC" stroke-width="1.5" rx="5"/>
+        <rect x="588" y="120" width="190" height="20" fill="#AFA9EC" rx="5"/>
+        <rect x="588" y="136" width="190" height="4" fill="#AFA9EC"/>
+        <text x="683" y="134" font-size="9" fill="#3C3489" text-anchor="middle" font-family="sans-serif" font-weight="700">라 사이언스 관</text>
+        <text x="683" y="153" font-size="8" fill="#3C3489" text-anchor="middle" font-family="sans-serif">식품 위생학 201</text>
+        <text x="683" y="165" font-size="8" fill="#3C3489" text-anchor="middle" font-family="sans-serif">제과제빵 재료학 202</text>
+        <text x="683" y="177" font-size="8" fill="#3C3489" text-anchor="middle" font-family="sans-serif">베이커리 경영론 301</text>
+        <text x="683" y="192" font-size="7.5" fill="#aaa" text-anchor="middle" font-family="sans-serif">📚 이론 전용동</text>
+
+        <!-- ===== 아랫 구역 ===== -->
+
+        <!-- 케이크 디자인 별관 -->
+        <rect x="408" y="270" width="140" height="60" fill="#FBE8F3" stroke="#EDA8CF" stroke-width="1.5" rx="5"/>
+        <rect x="408" y="270" width="140" height="18" fill="#EDA8CF" rx="5"/>
+        <rect x="408" y="284" width="140" height="4" fill="#EDA8CF"/>
+        <text x="478" y="283" font-size="9" fill="#6B1B42" text-anchor="middle" font-family="sans-serif" font-weight="700">르 수크레 별관</text>
+        <text x="478" y="301" font-size="8" fill="#6B1B42" text-anchor="middle" font-family="sans-serif">케이크 디자인 202</text>
+        <text x="478" y="313" font-size="8" fill="#6B1B42" text-anchor="middle" font-family="sans-serif">마카롱 아틀리에 201</text>
+        <text x="478" y="322" font-size="7.5" fill="#aaa" text-anchor="middle" font-family="sans-serif">🎂 제과 실습실</text>
+
+        <!-- 학생 휴게동 -->
+        <rect x="570" y="270" width="110" height="55" fill="#f5f0e8" stroke="#d0cdc6" stroke-width="1.5" rx="5"/>
+        <rect x="570" y="270" width="110" height="18" fill="#d0cdc6" rx="5"/>
+        <rect x="570" y="284" width="110" height="4" fill="#d0cdc6"/>
+        <text x="625" y="283" font-size="9" fill="#555" text-anchor="middle" font-family="sans-serif" font-weight="700">학생 휴게동</text>
+        <text x="625" y="301" font-size="8" fill="#777" text-anchor="middle" font-family="sans-serif">카페테리아 / 라운지</text>
+        <text x="625" y="314" font-size="7.5" fill="#aaa" text-anchor="middle" font-family="sans-serif">☕ 1층 카페</text>
+
+        <!-- 행정동 -->
+        <rect x="700" y="270" width="100" height="55" fill="#f5f0e8" stroke="#d0cdc6" stroke-width="1.5" rx="5"/>
+        <rect x="700" y="270" width="100" height="18" fill="#d0cdc6" rx="5"/>
+        <rect x="700" y="284" width="100" height="4" fill="#d0cdc6"/>
+        <text x="750" y="283" font-size="9" fill="#555" text-anchor="middle" font-family="sans-serif" font-weight="700">행정동</text>
+        <text x="750" y="301" font-size="8" fill="#777" text-anchor="middle" font-family="sans-serif">학사지원팀</text>
+        <text x="750" y="314" font-size="7.5" fill="#aaa" text-anchor="middle" font-family="sans-serif">입학처 / 장학팀</text>
+
+        <!-- 주차장 -->
+        <rect x="60" y="270" width="120" height="60" fill="#e8e4dc" stroke="#c8c4bb" stroke-width="1.5" rx="5"/>
+        <text x="120" y="298" font-size="11" fill="#888" text-anchor="middle" font-family="sans-serif" font-weight="600">주차장</text>
+        <text x="120" y="314" font-size="8" fill="#aaa" text-anchor="middle" font-family="sans-serif">80대 수용</text>
+
+        <!-- 도서관 -->
+        <rect x="200" y="270" width="140" height="60" fill="#f0ece0" stroke="#c8b97a" stroke-width="1.5" rx="5"/>
+        <rect x="200" y="270" width="140" height="18" fill="#c8b97a" rx="5"/>
+        <rect x="200" y="284" width="140" height="4" fill="#c8b97a"/>
+        <text x="270" y="283" font-size="9" fill="#5a4200" text-anchor="middle" font-family="sans-serif" font-weight="700">라 비블리오테크</text>
+        <text x="270" y="301" font-size="8" fill="#5a4200" text-anchor="middle" font-family="sans-serif">도서관 / 자료실</text>
+        <text x="270" y="314" font-size="7.5" fill="#aaa" text-anchor="middle" font-family="sans-serif">📖 열람실 2층</text>
+
+        <!-- 중앙광장 -->
+        <ellipse cx="185" cy="360" rx="60" ry="40" fill="#c8e6b4" stroke="#a0c88a" stroke-width="1.5"/>
+        <text x="185" y="356" font-size="9" fill="#3a6a1a" text-anchor="middle" font-family="sans-serif" font-weight="600">중앙광장</text>
+        <text x="185" y="369" font-size="8" fill="#5a8a3a" text-anchor="middle" font-family="sans-serif">야외 실습</text>
+
+        <!-- 북쪽 표시 -->
+        <circle cx="790" cy="470" r="18" fill="#fff" stroke="#ccc" stroke-width="1"/>
+        <text x="790" y="462" font-size="11" fill="#555" text-anchor="middle" font-family="sans-serif" font-weight="700">N</text>
+        <line x1="790" y1="456" x2="790" y2="448" stroke="#e05" stroke-width="2"/>
+        <polygon points="790,445 787,453 793,453" fill="#e05"/>
+        <text x="790" y="484" font-size="9" fill="#aaa" text-anchor="middle" font-family="sans-serif">북</text>
+
+        <!-- 범례 -->
+        <rect x="20" y="430" width="330" height="58" fill="rgba(255,255,255,0.7)" rx="6"/>
+        <text x="30" y="446" font-size="9" fill="#555" font-family="sans-serif" font-weight="600">범례</text>
+        <rect x="30" y="452" width="10" height="8" fill="#FEF3E2" stroke="#F5C97A" stroke-width="1" rx="1"/>
+        <text x="45" y="460" font-size="8" fill="#555" font-family="sans-serif">제빵</text>
+        <rect x="80" y="452" width="10" height="8" fill="#FBE8F3" stroke="#EDA8CF" stroke-width="1" rx="1"/>
+        <text x="95" y="460" font-size="8" fill="#555" font-family="sans-serif">제과</text>
+        <rect x="130" y="452" width="10" height="8" fill="#E8F5EE" stroke="#7DCCA4" stroke-width="1" rx="1"/>
+        <text x="145" y="460" font-size="8" fill="#555" font-family="sans-serif">교양</text>
+        <rect x="180" y="452" width="10" height="8" fill="#EEEDFE" stroke="#AFA9EC" stroke-width="1" rx="1"/>
+        <text x="195" y="460" font-size="8" fill="#555" font-family="sans-serif">이론</text>
+        <rect x="230" y="452" width="10" height="8" fill="#f5f0e8" stroke="#d0cdc6" stroke-width="1" rx="1"/>
+        <text x="245" y="460" font-size="8" fill="#555" font-family="sans-serif">편의시설</text>
+        <rect x="30" y="466" width="10" height="8" fill="#c8e6b4" stroke="#a0c88a" stroke-width="1" rx="2"/>
+        <text x="45" y="474" font-size="8" fill="#555" font-family="sans-serif">녹지·광장</text>
+        <rect x="80" y="466" width="10" height="8" fill="#ddd9d0" stroke="#ccc" stroke-width="1" rx="1"/>
+        <text x="95" y="474" font-size="8" fill="#555" font-family="sans-serif">도로</text>
+      </svg>
+    </div>
+  </div>
+</div>
+
+<script>
+const DAYS=['월','화','수','목','금','토'];
+const START=9,END=20,SLOTS=END-START,SLOT_H=52;
+
+const CATALOG=[
+  {id:'c1', name:'브레드 베이킹 기초',  room:'라 포르네 관 101',    cat:'제빵', credits:3, color:{bg:'#FEF3E2',text:'#7C4A00',border:'#F5C97A'}},
+  {id:'c2', name:'아르티장 브레드',      room:'라 포르네 관 102',    cat:'제빵', credits:2, color:{bg:'#FEF3E2',text:'#7C4A00',border:'#F5C97A'}},
+  {id:'c3', name:'바게트 & 크루아상',   room:'라 포르네 관 201',    cat:'제빵', credits:3, color:{bg:'#FEF3E2',text:'#7C4A00',border:'#F5C97A'}},
+  {id:'c4', name:'파티세리 기초',        room:'르 수크레 관 101',    cat:'제과', credits:2, color:{bg:'#FBE8F3',text:'#6B1B42',border:'#EDA8CF'}},
+  {id:'c5', name:'초콜라티에 입문',      room:'르 수크레 관 102',    cat:'제과', credits:3, color:{bg:'#FBE8F3',text:'#6B1B42',border:'#EDA8CF'}},
+  {id:'c6', name:'타르트 & 파이',       room:'르 수크레 관 201',    cat:'제과', credits:2, color:{bg:'#FBE8F3',text:'#6B1B42',border:'#EDA8CF'}},
+  {id:'c7', name:'케이크 디자인',        room:'르 수크레 관 202',    cat:'제과', credits:3, color:{bg:'#FBE8F3',text:'#6B1B42',border:'#EDA8CF'}},
+  {id:'c8', name:'웨딩 케이크 마스터',  room:'라 그라스 관 301',    cat:'제과', credits:2, color:{bg:'#FBE8F3',text:'#6B1B42',border:'#EDA8CF'}},
+  {id:'c9', name:'냉동 디저트 & 글라세',room:'라 그라스 관 101',    cat:'제과', credits:3, color:{bg:'#E8F4FB',text:'#0D3F6E',border:'#8EC9EF'}},
+  {id:'c10',name:'마카롱 아틀리에',     room:'라 마종 관 201',      cat:'제과', credits:2, color:{bg:'#FBE8F3',text:'#6B1B42',border:'#EDA8CF'}},
+  {id:'c11',name:'다도 & 티 페어링',   room:'라 마종 관 101',      cat:'교양', credits:2, color:{bg:'#E8F5EE',text:'#0D4A2A',border:'#7DCCA4'}},
+  {id:'c12',name:'플라워 케이크 데코',  room:'라 마종 관 102',      cat:'교양', credits:3, color:{bg:'#E8F5EE',text:'#0D4A2A',border:'#7DCCA4'}},
+  {id:'c13',name:'테이블 플로리스트리', room:'라 마종 관 103',      cat:'교양', credits:2, color:{bg:'#E8F5EE',text:'#0D4A2A',border:'#7DCCA4'}},
+  {id:'c14',name:'프렌치 에티켓',        room:'라 마종 관 104',      cat:'교양', credits:2, color:{bg:'#E8F5EE',text:'#0D4A2A',border:'#7DCCA4'}},
+  {id:'c15',name:'푸드 포토그래피',     room:'라 뤼미에르 관 B1',  cat:'교양', credits:3, color:{bg:'#E8F5EE',text:'#0D4A2A',border:'#7DCCA4'}},
+  {id:'c16',name:'식품 위생학',          room:'라 사이언스 관 201',  cat:'이론', credits:2, color:{bg:'#EEEDFE',text:'#3C3489',border:'#AFA9EC'}},
+  {id:'c17',name:'제과제빵 재료학',     room:'라 사이언스 관 202',  cat:'이론', credits:3, color:{bg:'#EEEDFE',text:'#3C3489',border:'#AFA9EC'}},
+  {id:'c18',name:'베이커리 경영론',      room:'라 사이언스 관 301',  cat:'이론', credits:2, color:{bg:'#EEEDFE',text:'#3C3489',border:'#AFA9EC'}},
+];
+
+const CAT_ORDER=['제빵','제과','교양','이론'];
+let placed=[],idCounter=0,dragChip=null,dragBlock=null,resizeState=null;
+
+function updateTotalCredits(){
+  const total=placed.reduce((s,p)=>{const c=CATALOG.find(x=>x.id===p.cid);return s+(c?c.credits:0);},0);
+  document.getElementById('totalCredit').textContent=total;
+}
+
+function buildSidebar(){
+  const list=document.getElementById('chipList');
+  list.innerHTML='';
+  CAT_ORDER.forEach(cat=>{
+    const items=CATALOG.filter(c=>c.cat===cat);
+    if(!items.length) return;
+    const lbl=document.createElement('div');
+    lbl.className='cat-label';
+    lbl.textContent=cat;
+    list.appendChild(lbl);
+    items.forEach(course=>{
+      const isUsed=placed.some(p=>p.cid===course.id);
+      const chip=document.createElement('div');
+      chip.className='chip'+(isUsed?' used':'');
+      chip.style.cssText=`background:${course.color.bg};color:${course.color.text};border-color:${course.color.border}`;
+      chip.innerHTML=`<span class="chip-name">${course.name}</span><span class="chip-badge">${course.credits}학점</span>`;
+      if(!isUsed){
+        chip.draggable=true;
+        chip.addEventListener('dragstart',e=>{dragChip=course.id;dragBlock=null;e.dataTransfer.effectAllowed='copy';});
+      }
+      list.appendChild(chip);
+    });
+  });
+}
+
+function buildGrid(){
+  const tc=document.getElementById('timeCol');
+  tc.innerHTML='<div class="t-hdr"></div>';
+  for(let i=0;i<SLOTS;i++){
+    const d=document.createElement('div');
+    d.className='t-slot';
+    d.textContent=(START+i)+':00';
+    tc.appendChild(d);
+  }
+  const dw=document.getElementById('daysWrap');
+  dw.innerHTML='';
+  DAYS.forEach((day,di)=>{
+    const col=document.createElement('div');
+    col.className='day-col';
+    col.innerHTML=`<div class="d-hdr">${day}</div>`;
+    const body=document.createElement('div');
+    body.className='d-body';
+    body.dataset.day=di;
+    for(let i=0;i<SLOTS;i++){
+      const cell=document.createElement('div');
+      cell.className='cell';
+      cell.dataset.slot=i;
+      cell.addEventListener('dragover',e=>{e.preventDefault();cell.classList.add('drag-over');});
+      cell.addEventListener('dragleave',()=>cell.classList.remove('drag-over'));
+      cell.addEventListener('drop',e=>{
+        e.preventDefault();cell.classList.remove('drag-over');
+        const day=parseInt(body.dataset.day),slot=parseInt(cell.dataset.slot);
+        if(dragChip){
+          const course=CATALOG.find(c=>c.id===dragChip);
+          if(!course) return;
+          const dur=course.credits;
+          if(hasOverlap(day,slot,dur,null)) return;
+          placed.push({id:++idCounter,cid:course.id,day,slot,duration:dur});
+          dragChip=null;renderBlocks();buildSidebar();updateTotalCredits();
+        } else if(dragBlock!==null){
+          const blk=placed.find(p=>p.id===dragBlock);
+          if(!blk||hasOverlap(day,slot,blk.duration,dragBlock)) return;
+          blk.day=day;blk.slot=Math.max(0,Math.min(SLOTS-blk.duration,slot));
+          dragBlock=null;renderBlocks();
+        }
+      });
+      body.appendChild(cell);
+    }
+    col.appendChild(body);dw.appendChild(col);
+  });
+}
+
+function hasOverlap(day,slot,dur,excludeId){
+  return placed.some(p=>p.id!==excludeId&&p.day===day&&!(slot+dur<=p.slot||slot>=p.slot+p.duration));
+}
+
+function renderBlocks(){
+  document.querySelectorAll('.block').forEach(el=>el.remove());
+  placed.forEach(blk=>{
+    const course=CATALOG.find(c=>c.id===blk.cid);
+    if(!course) return;
+    const body=document.querySelector(`.d-body[data-day="${blk.day}"]`);
+    if(!body) return;
+    const el=document.createElement('div');
+    el.className='block';
+    el.dataset.id=blk.id;
+    el.style.cssText=`background:${course.color.bg};color:${course.color.text};border-color:${course.color.border};top:${blk.slot*SLOT_H+1}px;height:${blk.duration*SLOT_H-2}px;`;
+    el.innerHTML=`<div class="b-name">${course.name}</div><div class="b-room">${course.room}</div><div class="b-credit">${course.credits}학점</div><div class="b-del">✕</div><div class="b-rsz"></div>`;
+    el.draggable=true;
+    el.addEventListener('dragstart',e=>{dragBlock=blk.id;dragChip=null;e.dataTransfer.effectAllowed='move';setTimeout(()=>el.classList.add('dragging'),0);});
+    el.addEventListener('dragend',()=>el.classList.remove('dragging'));
+    el.querySelector('.b-del').addEventListener('mousedown',e=>{
+      e.stopPropagation();
+      placed=placed.filter(p=>p.id!==blk.id);
+      renderBlocks();buildSidebar();updateTotalCredits();
+    });
+    el.querySelector('.b-rsz').addEventListener('mousedown',e=>{
+      e.stopPropagation();e.preventDefault();
+      resizeState={id:blk.id,startY:e.clientY,origDur:blk.duration};
+    });
+    body.appendChild(el);
+  });
+}
+
+document.addEventListener('mousemove',e=>{
+  if(!resizeState) return;
+  const blk=placed.find(p=>p.id===resizeState.id);
+  if(!blk) return;
+  const newDur=Math.max(1,Math.min(SLOTS-blk.slot,resizeState.origDur+Math.round((e.clientY-resizeState.startY)/SLOT_H)));
+  if(blk.duration!==newDur){blk.duration=newDur;renderBlocks();}
+});
+document.addEventListener('mouseup',()=>{resizeState=null;});
+
+function clearAll(){
+  if(!placed.length) return;
+  if(confirm('시간표를 초기화하시겠습니까?')){placed=[];renderBlocks();buildSidebar();updateTotalCredits();}
+}
+window.clearAll=clearAll;
+
+buildGrid();
+buildSidebar();
+</script>
+</body>
+</html>
